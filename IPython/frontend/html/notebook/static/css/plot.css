@@ -63,3 +63,27 @@ axis {
     stroke: #111;
     stroke-width: .5px;
 }
+
+.zoom-context .zoom-box {
+    cursor: move;
+}
+
+.zoom-context .zoom-box-mask {
+    fill: .444;
+    stroke: none;
+    opacity: .40;
+}
+
+.zoom-context .zoom-box-handle {
+    stroke: #000;
+    stroke-width: 4px;
+    opacity: 1;
+}
+
+.zoom-context .zoom-box-handle.left {
+    cursor: w-resize;
+}
+
+.zoom-context .zoom-box-handle.right {
+    cursor: e-resize;
+}

@@ -8,7 +8,7 @@ IPython = (function(IPython) {
         this.x = d3.scale.linear()
                  .domain([d3.min(points.x),
                           d3.max(points.x)])
-                  .range([0, this.w]),
+                 .range([0, this.w]),
         this.y = d3.scale.linear()
                  .domain([d3.max(points.y),
                           d3.min(points.y)])
@@ -17,9 +17,25 @@ IPython = (function(IPython) {
         this.points = points;
         this.points2d = d3.zip(points.x, points.y);
         this.plot_element = d3.select(element[0]);
-        this.uuid = utils.uuid();
+        this.uuid = utils.uuid(),
+        this.zoom_gap = 50,
+        this.zoom_y_scale = .25,
+        this.zoom_h = 100,
+        this.zoom_handle_extra = 5;
 
         this.create_svg();
+    };
+
+    Plot.prototype.closest_value_index = function(mouse_x){
+        var that = this;
+        var bisect_index = d3.bisect(that.points.x, mouse_x);
+        if (bisect_index === that.points.x.length || bisect_index === 0) {
+            return bisect_index;
+        }
+        if ((that.points.x[bisect_index - 1] - mouse_x) < (mouse_x - that.points.x[bisect_index])){
+            return bisect_index;
+        }
+        else return bisect_index - 1;
     };
 
     Plot.prototype.create_svg = function() {
@@ -37,15 +53,16 @@ IPython = (function(IPython) {
             title = title ? title : 'graph of data',
             desc = desc ? desc : 'graph of data';
 
-        var xAxis = d3.svg.axis().scale(x).tickSize(-h).tickSubdivide(true),
-            yAxis = d3.svg.axis().scale(y).tickSize(-w).ticks(4).orient("left");
+        var x_zoom = this.x_zoom = x.copy(),
+            x_axis = this.x_axis = d3.svg.axis().scale(x).tickSize(-h).tickSubdivide(true),
+            y_axis = this.y_axis = d3.svg.axis().scale(y).tickSize(-w).ticks(4).orient("left");
 
         var svg = this.plot_element
             .append("svg:svg")
             .attr("width", w + m[1] + m[3])
-            .attr("height", h + m[0] + m[2]);
+            .attr("height", h + m[0] + m[2] + this.zoom_gap + this.zoom_h);
 
-        var main = svg.append("svg:g")
+        var main = this.main = svg.append("svg:g")
             .attr("id", "main-" + this.uuid)
             .attr("transform", "translate(" + m[3] + "," + m[0] + ")");
 
@@ -61,7 +78,7 @@ IPython = (function(IPython) {
             .attr("width", w)
             .attr("height", h);
 
-        graph.attr("clip-path", "url(" + clip_id + ")");
+        graph.attr("clip-path", "url(#" + clip_id + ")");
 
         // add the area path for data sections
         graph.append("svg:g")
@@ -71,12 +88,12 @@ IPython = (function(IPython) {
         main.append("svg:g")
             .attr("class", "x axis")
             .attr("transform", "translate(0," + h + ")")
-            .call(xAxis);
+            .call(x_axis);
 
         // Add the y-axis.
         main.append("svg:g")
             .attr("class", "y axis")
-            .call(yAxis);
+            .call(y_axis);
 
         // add the line path for data sections
         graph.append("svg:g")
@@ -86,98 +103,121 @@ IPython = (function(IPython) {
             .attr("class", "graph points");
 
         // add a locator to graph
-        var locator = main.append("svg:g")
+        var locator = this.locator = main.append("svg:g")
             .attr("class", "locator");
         locator.append("svg:path");
         locator.append("svg:circle")
             .attr("r", 3.);
-        var locator_label = locator.append("svg:g")
+        var locator_label = this.locator_label = locator.append("svg:g")
             .attr("class", "locator-label");
         locator_label.append("svg:rect");
         locator_label.append("svg:text")
             .attr("dx", label_margin);
-
-        this.locator = locator;
-        this.locator_label = locator_label;
 
         // add a hitbox for grabbing mouseover events on the main time
         // series graph per SVG spec, pointer-events can only be applied
         // to graphics elements
         // note: possibly a bug in Firefox: if you attach this hitbox
         // rectangle to g#graph, events on the rect don't get dispatched
-        var graphHitbox = main.append("svg:rect")
-            .attr("id", "hitbox")
+        var graph_hitbox = main.append("svg:rect")
             .attr("width", w)
             .attr("height", h)
             .attr("visibility", "hidden")
             .attr("pointer-events", "all");
 
+        var zoom_offset = h + m[0] + this.zoom_gap;
+        var zoom_context = this.zoom_context = svg.append("svg:g")
+            .attr("class", "zoom-context")
+            .attr("transform", "translate(" + m[3] + ", " + zoom_offset + ")")
+            .append("svg:g")
+            .attr("transform", "scale(1," + this.zoom_y_scale + ")");
+        zoom_context.append("svg:g")
+            .attr("class", "graph areas");
+        zoom_context.append("svg:g")
+            .attr("class", "graph lines");
+        zoom_context.append("svg:g")
+            .attr("class", "graph points");
+
+        that.zoom_box = zoom_context.append("svg:rect")
+                .attr("class", "zoom-box")
+                .attr("pointer-events", "all")
+                .attr("visibility", "hidden")
+                .attr("height", h);
+        this.zoom_box_left_mask = zoom_context.append("svg:rect")
+                .attr("class", "zoom-box-mask")
+                .attr("height", h);
+        this.zoom_box_right_mask = zoom_context.append("svg:rect")
+                .attr("class", "zoom-box-mask")
+                .attr("height", h);
+        this.zoom_box_left_handle = zoom_context.append("svg:path")
+                .attr("class", "zoom-box-handle left");
+        this.zoom_box_right_handle = zoom_context.append("svg:path")
+                .attr("class", "zoom-box-handle right");
 
         // resize domain to be a little further out
         var y_domain_offset = (y.domain()[1] - y.domain()[0]) * .025;
         y.domain([y.domain()[0] - y_domain_offset, y.domain()[1] + y_domain_offset]);
 
         // SVG line generator
-        var line = d3.svg.line()
+        var line = this.line = d3.svg.line()
             .x(function(d) {return x(d[0]);})
             .y(function(d) {return y(d[1]);});
 
         // SVG area generator, for the fill
-        var area = d3.svg.area()
+        var area = this.area = d3.svg.area()
             .x(function(d) { return x(d[0]); })
             .y0(h)
             .y1(function(d) { return y(d[1]); });
 
-        var areas = graph.select(".graph.areas");
-        var lines = graph.select(".graph.lines");
-
-        main.select(".x.axis").call(xAxis);
-
-        var areaSelect = areas.selectAll("path.area").data([points2d]);
-        areaSelect.enter()
-            .insert("svg:path")
-            .attr("class", "area")
-            .attr("d", function(d){return area(d);});
-        areaSelect
-            .attr("d", function(d){return area(d);});
-        areaSelect.exit().remove();
-
-        var lineSelect = lines.selectAll("path.line").data([points2d]);
-        lineSelect.enter()
-            .insert("svg:path") .attr("class", "line")
-            .attr("d", function(d){return line(d);});
-        lineSelect
-            .attr("d", function(d){return line(d)});
-        lineSelect.exit().remove();
+        this.render_to_context(graph);
+        this.render_to_context(zoom_context);
 
         // set up locator mouse events
-        graphHitbox.on("mousemove", function(d) {
+        graph_hitbox.on("mousemove", function(d) {
             var mouse = d3.svg.mouse(this);
             that.move_locator(mouse);
         });
 
-        graphHitbox.on("mouseout", function (d) {
+        graph_hitbox.on("mouseout", function (d) {
             locator
                 .attr("visibility", "hidden");
         });
 
-        graphHitbox.on("mouseover", function (d) {
+        graph_hitbox.on("mouseover", function (d) {
             locator
                 .attr("visibility", "visible");
         });
 
-    };
+        // Adjust graph when dragging the zoom box
+        this.zoom_box.call(d3.behavior.drag().on("drag", function(d, i){
+            new_start = x_zoom.invert(x_zoom(x.domain()[0]) + d3.event.dx);
+            new_end = x_zoom.invert(x_zoom(x.domain()[1]) + d3.event.dx);
 
-    Plot.prototype.closest_value_index = function(mouse_x){
-        var that = this;
-        var bisect_index = d3.bisect(that.points.x, mouse_x);
-        if (bisect_index === that.points.x.length || bisect_index === 0) {
-            return bisect_index;
-        }
-        if ((that.points.x[bisect_index - 1] - mouse_x) < (mouse_x - that.points.x[bisect_index])){
-            return bisect_index;
-        }
-        else return bisect_index - 1;
+            if (x_zoom.domain()[0] < new_start && new_end < x_zoom.domain()[1]){
+                x.domain([new_start, new_end]);
+                that.render_to_context(graph);
+            }
+        }));
+
+        // Adjust graph when dragging left zoom handle
+        this.zoom_box_left_handle.call(d3.behavior.drag().on("drag", function(d, i){
+            new_start = x_zoom.invert(x_zoom(x.domain()[0]) + d3.event.dx);
+
+            if (x_zoom.domain()[0] < new_start && new_start < x.domain()[1]){
+                x.domain([new_start, x.domain()[1]]);
+                that.render_to_context(graph);
+            }
+        }));
+
+        // Adjust graph when dragging right zoom handle
+        this.zoom_box_right_handle.call(d3.behavior.drag().on("drag", function(d, i){
+            new_end = x_zoom.invert(x_zoom(x.domain()[1]) + d3.event.dx);
+
+            if (new_end < x_zoom.domain()[1] && x.domain()[0] < new_end){
+                x.domain([x.domain()[0], new_end]);
+                that.render_to_context(graph);
+            }
+        }));
     };
 
     Plot.prototype.move_locator = function(mouse){
@@ -201,7 +241,7 @@ IPython = (function(IPython) {
 
         // catch cases where closest_point is off the edge of the
         // graph; this is necessary due to FF workaround (see:
-        // comments near graphHitbox above)
+        // comments near graph_hitbox above)
         if (closest_point === undefined){
             return;
         }
@@ -225,6 +265,57 @@ IPython = (function(IPython) {
             .attr("width", text_bbox.width + label_margin * 2)
             .attr("height", text_bbox.height + label_margin);
     };
+
+    Plot.prototype.render_to_context = function(context){
+        var that = this;
+        var areas = context.select(".graph.areas");
+        var lines = context.select(".graph.lines");
+
+        that.main.select(".x.axis").call(that.x_axis);
+
+        var areaSelect = areas.selectAll("path.area").data([that.points2d]);
+        areaSelect.enter()
+            .insert("svg:path")
+            .attr("class", "area")
+            .attr("d", function(d){return that.area(d);});
+        areaSelect
+            .attr("d", function(d){return that.area(d);});
+        areaSelect.exit().remove();
+
+        var lineSelect = lines.selectAll("path.line").data([that.points2d]);
+        lineSelect.enter()
+            .insert("svg:path") .attr("class", "line")
+            .attr("d", function(d){return that.line(d);});
+        lineSelect
+            .attr("d", function(d){return that.line(d);});
+        lineSelect.exit().remove();
+
+        that.update_zoom_box();
+    };
+
+    Plot.prototype.update_zoom_box = function(){
+        var that = this;
+
+        var x = that.x,
+            x_zoom = that.x_zoom;
+
+        var left_side = x_zoom(x.domain()[0]);
+        var right_side = x_zoom(x.domain()[1]);
+        var zoom_handle_extra_scaled = that.zoom_handle_extra / that.zoom_y_scale;
+        that.zoom_box_left_mask
+            .attr("width", left_side);
+        that.zoom_box_left_handle
+            .attr("d", d3.svg.line()([[left_side, 0 - zoom_handle_extra_scaled], [left_side, that.h + zoom_handle_extra_scaled]]));
+        that.zoom_box
+            .attr("x", left_side)
+            .attr("width", right_side - left_side);
+        that.zoom_box_right_handle
+            .attr("d", d3.svg.line()([[right_side, 0 - zoom_handle_extra_scaled], [right_side, that.h + zoom_handle_extra_scaled]]));
+        that.zoom_box_right_mask
+            .attr("x", right_side)
+            .attr("width", that.w - right_side);
+    };
+
 
     IPython.Plot = Plot;
 
