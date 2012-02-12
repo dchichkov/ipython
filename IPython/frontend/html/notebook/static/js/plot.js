@@ -193,6 +193,40 @@ IPython = (function(IPython) {
                 .attr("visibility", "visible");
         });
 
+        // note: this is all a bit hacky but d3.behavior.zoom() is
+        //       being refactored to work with domain extents, so it
+        //       should be possible for all of this to look a whole
+        //       lot simpler/cleaner very soon. See PR:
+        //       https://github.com/mbostock/d3/pull/488
+        this.previous_zoom_scale = 1;
+        graph_hitbox.call(d3.behavior.zoom().on("zoom", function() {
+            var orig_domain = that.x.domain(),
+                entire_domain = that.x_zoom.domain();
+            d3.event.transform(that.x);
+
+            // don't zoom beyond our range of x values
+            if(that.x.domain()[0] < entire_domain[0]) {
+                that.x.domain([entire_domain[0], that.x.domain()[1]]);
+            };
+            if(that.x.domain()[1] > entire_domain[1]) {
+                that.x.domain([that.x.domain()[0], entire_domain[1]]);
+            };
+
+            // if we're at an edge and dragging closer to that edge,
+            // then we don't want to change anything
+            var new_domain = that.x.domain();
+            var domain_size_change = (orig_domain[1] - orig_domain[0]) - (new_domain[1] - new_domain[0]);
+            var scale_change = (that.previous_zoom_scale - d3.event.scale);
+            if (!scale_change && domain_size_change.toFixed(10)) {
+                if (new_domain[0] == entire_domain[0] || new_domain[1] == entire_domain[1]) {
+                    that.x.domain(orig_domain);
+                }
+            };
+
+            that.render(graph);
+            that.previous_zoom_scale = d3.event.scale;
+        }));
+
         // Adjust graph when dragging the zoom box
         this.zoom_box.call(d3.behavior.drag().on("drag", function(d, i){
             new_start = x_zoom.invert(x_zoom(x.domain()[0]) + d3.event.dx);
@@ -309,8 +343,9 @@ IPython = (function(IPython) {
 
         var left_side = x_zoom(x.domain()[0]);
         var right_side = x_zoom(x.domain()[1]);
+
         that.zoom_box_left_mask
-            .attr("width", left_side);
+            .attr("width", left_side > 0 ? left_side : 0);
         that.zoom_box_left_handle
             .attr("d", d3.svg.line()([[left_side, 0 - zoom_handle_extra], [left_side, zoom_h]]));
         that.zoom_box
@@ -322,7 +357,7 @@ IPython = (function(IPython) {
             .attr("d", d3.svg.line()([[right_side, 0 - zoom_handle_extra], [right_side, zoom_h]]));
         that.zoom_box_right_mask
             .attr("x", right_side)
-            .attr("width", that.w - right_side);
+            .attr("width", that.w - right_side > 0 ? that.w - right_side : 0);
     };
 
 
