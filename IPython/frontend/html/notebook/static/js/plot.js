@@ -104,7 +104,8 @@ IPython = (function(IPython) {
 
         // add a locator to graph
         var locator = this.locator = main.append("svg:g")
-            .attr("class", "locator");
+            .attr("class", "locator")
+            .attr("visibility", "hidden");
         locator.append("svg:path");
         locator.append("svg:circle")
             .attr("r", 3.);
