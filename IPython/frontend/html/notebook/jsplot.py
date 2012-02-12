@@ -10,4 +10,4 @@ except ImportError:
 
 def plot(x, y):
     points = {'x': x, 'y': y}
-    return Javascript("plot(element, %s);" % json.dumps(points))
+    return Javascript("new IPython.Plot(element, %s);" % json.dumps(points))
