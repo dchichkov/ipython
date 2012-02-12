@@ -174,8 +174,8 @@ IPython = (function(IPython) {
             .y0(h)
             .y1(function(d) { return y(d[1]); });
 
-        this.render_to_context(graph);
-        this.render_to_context(zoom_graph);
+        this.render(graph);
+        this.render(zoom_graph);
 
         // set up locator mouse events
         graph_hitbox.on("mousemove", function(d) {
@@ -200,7 +200,7 @@ IPython = (function(IPython) {
 
             if (x_zoom.domain()[0] < new_start && new_end < x_zoom.domain()[1]){
                 x.domain([new_start, new_end]);
-                that.render_to_context(graph);
+                that.render(graph);
             }
         }));
 
@@ -210,7 +210,7 @@ IPython = (function(IPython) {
 
             if (x_zoom.domain()[0] < new_start && new_start < x.domain()[1]){
                 x.domain([new_start, x.domain()[1]]);
-                that.render_to_context(graph);
+                that.render(graph);
             }
         }));
 
@@ -220,7 +220,7 @@ IPython = (function(IPython) {
 
             if (new_end < x_zoom.domain()[1] && x.domain()[0] < new_end){
                 x.domain([x.domain()[0], new_end]);
-                that.render_to_context(graph);
+                that.render(graph);
             }
         }));
     };
@@ -271,7 +271,7 @@ IPython = (function(IPython) {
             .attr("height", text_bbox.height + label_margin);
     };
 
-    Plot.prototype.render_to_context = function(context){
+    Plot.prototype.render = function(context){
         var that = this;
         var areas = context.select(".graph.areas");
         var lines = context.select(".graph.lines");
