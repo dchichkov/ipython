@@ -19,9 +19,10 @@ IPython = (function(IPython) {
         this.plot_element = d3.select(element[0]);
         this.uuid = utils.uuid(),
         this.zoom_gap = 50,
-        this.zoom_y_scale = .25,
         this.zoom_h = 100,
+        this.zoom_y_scale = this.zoom_h / this.h,
         this.zoom_handle_extra = 5;
+        this.zoom_underline_offset = 1;
 
         this.create_svg();
     };
@@ -129,27 +130,30 @@ IPython = (function(IPython) {
         var zoom_offset = h + m[0] + this.zoom_gap;
         var zoom_context = this.zoom_context = svg.append("svg:g")
             .attr("class", "zoom-context")
-            .attr("transform", "translate(" + m[3] + ", " + zoom_offset + ")")
-            .append("svg:g")
+            .attr("transform", "translate(" + m[3] + ", " + zoom_offset + ")");
+        var zoom_graph = this.zoom_context.append("svg:g")
+            .attr("class", "zoom-graph")
             .attr("transform", "scale(1," + this.zoom_y_scale + ")");
-        zoom_context.append("svg:g")
+        zoom_graph.append("svg:g")
             .attr("class", "graph areas");
-        zoom_context.append("svg:g")
+        zoom_graph.append("svg:g")
             .attr("class", "graph lines");
-        zoom_context.append("svg:g")
+        zoom_graph.append("svg:g")
             .attr("class", "graph points");
 
-        that.zoom_box = zoom_context.append("svg:rect")
+        this.zoom_box_under_line = zoom_context.append("svg:path")
+                .attr("class", "zoom-box-under-line");
+        this.zoom_box = zoom_context.append("svg:rect")
                 .attr("class", "zoom-box")
                 .attr("pointer-events", "all")
                 .attr("visibility", "hidden")
-                .attr("height", h);
+                .attr("height", this.zoom_h);
         this.zoom_box_left_mask = zoom_context.append("svg:rect")
                 .attr("class", "zoom-box-mask")
-                .attr("height", h);
+                .attr("height", this.zoom_h);
         this.zoom_box_right_mask = zoom_context.append("svg:rect")
                 .attr("class", "zoom-box-mask")
-                .attr("height", h);
+                .attr("height", this.zoom_h);
         this.zoom_box_left_handle = zoom_context.append("svg:path")
                 .attr("class", "zoom-box-handle left");
         this.zoom_box_right_handle = zoom_context.append("svg:path")
@@ -171,7 +175,7 @@ IPython = (function(IPython) {
             .y1(function(d) { return y(d[1]); });
 
         this.render_to_context(graph);
-        this.render_to_context(zoom_context);
+        this.render_to_context(zoom_graph);
 
         // set up locator mouse events
         graph_hitbox.on("mousemove", function(d) {
@@ -298,20 +302,24 @@ IPython = (function(IPython) {
         var that = this;
 
         var x = that.x,
-            x_zoom = that.x_zoom;
+            x_zoom = that.x_zoom,
+            zoom_h = that.zoom_h,
+            zoom_handle_extra = that.zoom_handle_extra,
+            zoom_underline_offset = that.zoom_underline_offset;
 
         var left_side = x_zoom(x.domain()[0]);
         var right_side = x_zoom(x.domain()[1]);
-        var zoom_handle_extra_scaled = that.zoom_handle_extra / that.zoom_y_scale;
         that.zoom_box_left_mask
             .attr("width", left_side);
         that.zoom_box_left_handle
-            .attr("d", d3.svg.line()([[left_side, 0 - zoom_handle_extra_scaled], [left_side, that.h + zoom_handle_extra_scaled]]));
+            .attr("d", d3.svg.line()([[left_side, 0 - zoom_handle_extra], [left_side, zoom_h]]));
         that.zoom_box
             .attr("x", left_side)
             .attr("width", right_side - left_side);
+        that.zoom_box_under_line
+            .attr("d", d3.svg.line()([[left_side, zoom_h - zoom_underline_offset], [right_side, zoom_h - zoom_underline_offset]]));
         that.zoom_box_right_handle
-            .attr("d", d3.svg.line()([[right_side, 0 - zoom_handle_extra_scaled], [right_side, that.h + zoom_handle_extra_scaled]]));
+            .attr("d", d3.svg.line()([[right_side, 0 - zoom_handle_extra], [right_side, zoom_h]]));
         that.zoom_box_right_mask
             .attr("x", right_side)
             .attr("width", that.w - right_side);

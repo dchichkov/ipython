@@ -87,3 +87,9 @@ axis {
 .zoom-context .zoom-box-handle.right {
     cursor: e-resize;
 }
+
+.zoom-context .zoom-box-under-line {
+    stroke: #000;
+    stroke-width: 2px;
+    opacity: 1;
+}
