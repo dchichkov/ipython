@@ -46,3 +46,20 @@ axis {
     fill: none;
     stroke: #000;
 }
+
+.locator path {
+    fill: none;
+    stroke: #666;
+    stroke-width: 1px;
+}
+
+.locator circle {
+    fill: #337;
+    stroke: #337;
+}
+
+.locator .locator-label rect {
+    fill: #fff;
+    stroke: #111;
+    stroke-width: .5px;
+}
