@@ -9,5 +9,5 @@ except ImportError:
 
 
 def plot(x, y):
-    points = {'x': x, 'y': y}
+    points = [zip(x, y)]
     return Javascript("new IPython.Plot(element, %s);" % json.dumps(points))

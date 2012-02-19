@@ -2,25 +2,45 @@ IPython = (function(IPython) {
 
     var utils = IPython.utils;
 
-    var Plot = function(element, points) {
+    var is_date = function(obj) {
+        return Object.prototype.toString.call(points.x[0]) === '[object Date]';
+    };
+
+    var equals = function (obj1, obj2) {
+        if (is_date(obj1)) {
+            return obj1.valueOf() === obj2.valueOf();
+        }
+        else {return obj1 === obj2;}
+    };
+
+    var Plot = function(plot_element, segments, format_label) {
         this.w = 800,
         this.h = 300;
+        this.segments = segments;
+        this.points2d = points2d = d3.merge(segments);
+        this.points = points = {
+            'x': points2d.map(function(v){return v[0];}),
+            'y': points2d.map(function(v){return v[1];})
+            };
+        this.single_points = segments
+            .filter(function (d) {return d.length === 1;})
+            .map(function(d) {return d[0];});
+
         this.x = d3.scale.linear()
                  .domain([d3.min(points.x),
                           d3.max(points.x)])
-                 .range([0, this.w]),
+                 .range([0, this.w]);
         this.y = d3.scale.linear()
                  .domain([d3.max(points.y),
                           d3.min(points.y)])
                  .range([0, this.h]);
+        this.format_label = format_label ? format_label : function(point){return "(" + point[0] + ", " + point[1] + ")";};
         this.label_margin = 5;
-        this.points = points;
-        this.points2d = d3.zip(points.x, points.y);
-        this.plot_element = d3.select(element[0]);
-        this.uuid = utils.uuid(),
-        this.zoom_gap = 50,
-        this.zoom_h = 100,
-        this.zoom_y_scale = this.zoom_h / this.h,
+        this.plot_element = d3.select(plot_element[0]);
+        this.uuid = utils.uuid();
+        this.zoom_gap = 50;
+        this.zoom_h = 40;
+        this.zoom_y_scale = this.zoom_h / this.h;
         this.zoom_handle_extra = 5;
         this.zoom_underline_offset = 1;
 
@@ -218,7 +238,7 @@ IPython = (function(IPython) {
             var domain_size_change = (orig_domain[1] - orig_domain[0]) - (new_domain[1] - new_domain[0]);
             var scale_change = (that.previous_zoom_scale - d3.event.scale);
             if (!scale_change && domain_size_change.toFixed(10)) {
-                if (new_domain[0] == entire_domain[0] || new_domain[1] == entire_domain[1]) {
+                if (equals(new_domain[0], entire_domain[0]) || equals(new_domain[1], entire_domain[1])) {
                     that.x.domain(orig_domain);
                 }
             };
@@ -292,7 +312,7 @@ IPython = (function(IPython) {
             .attr("cx", x_value)
             .attr("cy", y_value);
         locator_label.select("text")
-            .text("(" + closest_point[0] + ", " + closest_point[1] + ")");
+            .text(this.format_label(closest_point));
         var text_bbox = locator_label.select("text")[0][0].getBBox();
         var x_offset = (x_value + text_bbox.width) < w ? x_value : x_value - text_bbox.width - label_margin * 2,
         y_offset = (y_value - text_bbox.height);
@@ -307,27 +327,58 @@ IPython = (function(IPython) {
 
     Plot.prototype.render = function(context){
         var that = this;
-        var areas = context.select(".graph.areas");
-        var lines = context.select(".graph.lines");
+        var graph_areas = context.select(".graph.areas");
+        var graph_lines = context.select(".graph.lines");
+        var graph_points = context.select(".graph.points");
+        var x = this.x,
+            y = this.y,
+            h = this.h;
+
+        var single_points = this.single_points;
 
         that.main.select(".x.axis").call(that.x_axis);
 
-        var areaSelect = areas.selectAll("path.area").data([that.points2d]);
-        areaSelect.enter()
+        var area_select = graph_areas.selectAll("path.area").data(that.segments);
+        area_select.enter()
             .insert("svg:path")
             .attr("class", "area")
             .attr("d", function(d){return that.area(d);});
-        areaSelect
+        area_select
             .attr("d", function(d){return that.area(d);});
-        areaSelect.exit().remove();
+        area_select.exit().remove();
 
-        var lineSelect = lines.selectAll("path.line").data([that.points2d]);
-        lineSelect.enter()
+        var line_select = graph_lines.selectAll("path.line").data(that.segments);
+        line_select.enter()
             .insert("svg:path") .attr("class", "line")
             .attr("d", function(d){return that.line(d);});
-        lineSelect
+        line_select
             .attr("d", function(d){return that.line(d);});
-        lineSelect.exit().remove();
+        line_select.exit().remove();
+
+        var point_select = graph_points.selectAll("circle").data(single_points);
+        point_select.enter()
+            .insert("svg:circle")
+            .attr("class", "point")
+            .attr("r", 1)
+            .attr("cx", function(d){return x(d[0]);})
+            .attr("cy", function(d){return y(d[1]);});
+        point_select
+            .attr("cx", function(d){return x(d[0]);})
+            .attr("cy", function(d){return y(d[1]);});
+        point_select.exit().remove();
+
+        var point_line_select = graph_points.selectAll("path.line").data(single_points);
+        point_line_select.enter()
+            .insert("svg:path")
+            .attr("class", "line")
+            .attr("d", function(d){
+                return d3.svg.line()([[x(d[0]), y(d[1])], [x(d[0]), h]]);});
+        point_line_select
+            .attr("class", "line")
+            .attr("d", function(d){
+                return d3.svg.line()([[x(d[0]), y(d[1])], [x(d[0]), h]]);});
+        point_line_select.exit().remove();
+
 
         that.update_zoom_box();
     };
@@ -359,7 +410,6 @@ IPython = (function(IPython) {
             .attr("x", right_side)
             .attr("width", that.w - right_side > 0 ? that.w - right_side : 0);
     };
-
 
     IPython.Plot = Plot;
 
