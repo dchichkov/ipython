@@ -26,7 +26,9 @@ IPython = (function(IPython) {
             .filter(function (d) {return d.length === 1;})
             .map(function(d) {return d[0];});
 
-        this.x = d3.scale.linear()
+        var x_scale = is_date(points.x[0]) ? d3.time.scale() : d3.scale.linear();
+
+        this.x = x_scale
                  .domain([d3.min(points.x),
                           d3.max(points.x)])
                  .range([0, this.w]);
