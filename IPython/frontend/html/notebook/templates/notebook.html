@@ -26,6 +26,7 @@
     <link rel="stylesheet" href="{{ static_url("css/base.css") }}" type="text/css" />
     <link rel="stylesheet" href="{{ static_url("css/notebook.css") }}" type="text/css" />
     <link rel="stylesheet" href="{{ static_url("css/renderedhtml.css") }}" type="text/css" />
+    <link rel="stylesheet" href="{{ static_url("css/plot.css") }}" type="text/css" />
 
     {% comment  In the notebook, the read-only flag is used to determine %}
     {% comment  whether to hide the side panels and switch off input %}
@@ -238,7 +239,12 @@
 <script src="{{ static_url("js/notebook.js") }}" type="text/javascript" charset="utf-8"></script>
 <script src="{{ static_url("js/notificationwidget.js") }}" type="text/javascript" charset="utf-8"></script>
 <script src="{{ static_url("js/notebookmain.js") }}" type="text/javascript" charset="utf-8"></script>
+<script src="{{ static_url("js/plot.js") }}" type="text/javascript" charset="utf-8"></script>
 
+<script src="{{ static_url('d3/d3.js') }}"></script>
+<script src="{{ static_url('d3/d3.layout.min.js') }}"></script>
+<script src="{{ static_url('d3/d3.chart.min.js') }}"></script>
+<script src="{{ static_url('d3/d3.time.min.js') }}"></script>
 </body>
 
 </html>

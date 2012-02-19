@@ -1,0 +1,95 @@
+#graph {
+    clip-path: url(#clip);
+}
+
+path.line {
+    fill: none;
+    stroke: #337;
+    stroke-width: 1px;
+}
+
+path.area  {
+    fill: #e7e7ff;
+}
+
+.graph.points path.line {
+    stroke: #e7e7ff;
+}
+
+axis {
+    shape-rendering: crispEdges;
+}
+
+.x.axis line {
+    stroke: #000;
+    stroke-dasharray: 2;
+    opacity: .2;
+}
+
+.x.axis .minor {
+    display: none;
+    stroke-opacity: .1;
+}
+
+.x.axis path {
+    fill: none;
+    stroke: #000;
+}
+
+.y.axis line {
+    stroke: #000;
+    stroke-dasharray: 2;
+    opacity: .2;
+}
+
+.y.axis path {
+    fill: none;
+    stroke: #000;
+}
+
+.locator path {
+    fill: none;
+    stroke: #666;
+    stroke-width: 1px;
+}
+
+.locator circle {
+    fill: #337;
+    stroke: #337;
+}
+
+.locator .locator-label rect {
+    fill: #fff;
+    stroke: #111;
+    stroke-width: .5px;
+}
+
+.zoom-context .zoom-box {
+    cursor: move;
+}
+
+.zoom-context .zoom-box-mask {
+    fill: .444;
+    stroke: none;
+    opacity: .40;
+}
+
+.zoom-context .zoom-box-handle {
+    stroke: #000;
+    stroke-width: 4px;
+    opacity: 1;
+}
+
+.zoom-context .zoom-box-handle.left {
+    cursor: w-resize;
+}
+
+.zoom-context .zoom-box-handle.right {
+    cursor: e-resize;
+}
+
+.zoom-context .zoom-box-under-line {
+    stroke: #000;
+    stroke-width: 2px;
+    opacity: 1;
+}
