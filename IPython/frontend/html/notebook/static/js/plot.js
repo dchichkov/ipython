@@ -3,7 +3,7 @@ IPython = (function(IPython) {
     var utils = IPython.utils;
 
     var is_date = function(obj) {
-        return Object.prototype.toString.call(points.x[0]) === '[object Date]';
+        return Object.prototype.toString.call(obj) === '[object Date]';
     };
 
     var equals = function (obj1, obj2) {
@@ -13,40 +13,186 @@ IPython = (function(IPython) {
         else {return obj1 === obj2;}
     };
 
-    var Plot = function(plot_element, segments, format_label) {
-        this.w = 800,
-        this.h = 300;
-        this.segments = segments;
-        this.points2d = points2d = d3.merge(segments);
-        this.points = points = {
-            'x': points2d.map(function(v){return v[0];}),
-            'y': points2d.map(function(v){return v[1];})
-            };
-        this.single_points = segments
-            .filter(function (d) {return d.length === 1;})
-            .map(function(d) {return d[0];});
+    var Plot = function(plot_element, format_label) {
+        // var x_scale_type = is_date(points.x[0]) ? d3.time.scale() : d3.scale.linear();
 
-        var x_scale = is_date(points.x[0]) ? d3.time.scale() : d3.scale.linear();
-
-        this.x = x_scale
-                 .domain([d3.min(points.x),
-                          d3.max(points.x)])
-                 .range([0, this.w]);
-        this.y = d3.scale.linear()
-                 .domain([d3.max(points.y),
-                          d3.min(points.y)])
-                 .range([0, this.h]);
         this.format_label = format_label ? format_label : function(point){return "(" + point[0] + ", " + point[1] + ")";};
+        this.graph_elements = [];
+        this.h = 300;
+        this.id = utils.uuid();
         this.label_margin = 5;
         this.plot_element = d3.select(plot_element[0]);
-        this.uuid = utils.uuid();
+        this.w = 800;
+        this.x = d3.scale.linear();
+        this.y = d3.scale.linear();
         this.zoom_gap = 50;
         this.zoom_h = 40;
         this.zoom_y_scale = this.zoom_h / this.h;
         this.zoom_handle_extra = 5;
         this.zoom_underline_offset = 1;
 
-        this.create_svg();
+        this.setup_svg();
+    };
+
+    var Line = function(segments) {
+        this.points2d =  d3.merge(segments);
+        this.points = {
+            'x': this.points2d.map(function(v){return v[0];}),
+            'y': this.points2d.map(function(v){return v[1];})
+            };
+        this.id = utils.uuid();
+        this.min_x = d3.min(this.points.x);
+        this.min_y = d3.min(this.points.y);
+        this.max_x = d3.max(this.points.x);
+        this.max_y = d3.max(this.points.y);
+        this.single_points = segments
+            .filter(function (d) {return d.length === 1;})
+            .map(function(d) {return d[0];});
+        this.segments = segments;
+    };
+
+    Line.prototype.setup_svg = function(context) {
+        var line_context = context.append("svg:g")
+            .attr("id", "line-" + this.id);
+        line_context.append("svg:g")
+            .attr("class", "graph lines");
+        line_context.append("svg:g")
+            .attr("class", "graph points");
+    };
+
+    Line.prototype.render_to = function(context, plot) {
+        var line_context = context.select("#line-" + this.id);
+        if(line_context.empty()) {
+            this.setup_svg(context);
+            line_context = context.select("#line-" + this.id);
+        }
+        var graph_lines = line_context.select(".graph.lines");
+        var graph_points = line_context.select(".graph.points");
+        var x = plot.x,
+            y = plot.y,
+            h = plot.h;
+        var single_points = this.single_points;
+
+        // SVG line generator
+        var line = this.line = d3.svg.line()
+            .x(function(d) {return x(d[0]);})
+            .y(function(d) {return y(d[1]);});
+
+        var line_select = graph_lines.selectAll("path.line").data(this.segments);
+        line_select.enter()
+            .insert("svg:path") .attr("class", "line")
+            .attr("d", function(d){return line(d);});
+        line_select
+            .attr("d", function(d){return line(d);});
+        line_select.exit().remove();
+
+        var point_select = graph_points.selectAll("circle").data(single_points);
+        point_select.enter()
+            .insert("svg:circle")
+            .attr("class", "point")
+            .attr("r", 1)
+            .attr("cx", function(d){return x(d[0]);})
+            .attr("cy", function(d){return y(d[1]);});
+        point_select
+            .attr("cx", function(d){return x(d[0]);})
+            .attr("cy", function(d){return y(d[1]);});
+        point_select.exit().remove();
+    };
+
+    Plot.Line = Line;
+
+    var Area = function(segments) {
+        this.points2d =  d3.merge(segments);
+        this.points = {
+            'x': this.points2d.map(function(v){return v[0];}),
+            'y': this.points2d.map(function(v){return v[1];})
+            };
+        this.id = utils.uuid();
+        this.min_x = d3.min(this.points.x);
+        this.min_y = d3.min(this.points.y);
+        this.max_x = d3.max(this.points.x);
+        this.max_y = d3.max(this.points.y);
+        this.single_points = segments
+            .filter(function (d) {return d.length === 1;})
+            .map(function(d) {return d[0];});
+        this.segments = segments;
+
+    };
+
+    Area.prototype.setup_svg = function(context) {
+        var area_context = context.append("svg:g")
+            .attr("id", "area-" + this.id);
+        area_context.append("svg:g")
+            .attr("class", "graph areas");
+        area_context.append("svg:g")
+            .attr("class", "graph lines");
+    };
+
+    Area.prototype.render_to = function(context, plot) {
+        var area_context = context.select("#area-" + this.id);
+        if(area_context.empty()) {
+            this.setup_svg(context);
+            area_context = context.select("#area-" + this.id);
+        }
+        var graph_areas = area_context.select(".graph.areas");
+        var graph_lines = area_context.select(".graph.lines");
+        var x = plot.x,
+            y = plot.y,
+            h = plot.h;
+        var single_points = this.single_points;
+
+        // SVG line generator
+        var line = this.line = d3.svg.line()
+            .x(function(d) {return x(d[0]);})
+            .y(function(d) {return y(d[1]);});
+
+        // SVG area generator, for the fill
+        var area = this.area = d3.svg.area()
+            .x(function(d) { return x(d[0]); })
+            .y0(h)
+            .y1(function(d) { return y(d[1]); });
+
+        var area_select = graph_areas.selectAll("path.area").data(this.segments);
+        area_select.enter()
+            .insert("svg:path")
+            .attr("class", "area")
+            .attr("d", function(d){return area(d);});
+        area_select
+            .attr("d", function(d){return area(d);});
+        area_select.exit().remove();
+
+        var point_line_select = graph_lines.selectAll("path.line").data(single_points);
+        point_line_select.enter()
+            .insert("svg:path")
+            .attr("class", "line")
+            .attr("d", function(d){
+                return d3.svg.line()([[x(d[0]), y(d[1])], [x(d[0]), h]]);});
+        point_line_select
+            .attr("class", "line")
+            .attr("d", function(d){
+                return d3.svg.line()([[x(d[0]), y(d[1])], [x(d[0]), h]]);});
+        point_line_select.exit().remove();
+    };
+
+    Plot.Area = Area;
+
+    Plot.prototype.add_graph_element = function(graph_element){
+        this.min_x = d3.min([this.min_x, graph_element.min_x]);
+        this.max_x = d3.max([this.max_x, graph_element.max_x]);
+        this.x.domain([this.min_x, this.max_x])
+            .range([0, this.w]);
+        this.x_zoom.domain([this.min_x, this.max_x])
+            .range([0, this.w]);
+
+        this.min_y = d3.min([this.min_y, graph_element.min_y]);
+        this.max_y = d3.max([this.max_y, graph_element.max_y]);
+        this.y.domain([this.min_y, this.max_y])
+            .range([0, this.h]);
+
+        this.graph_elements.push(graph_element);
+
+        this.render(this.graph);
+        this.render(this.zoom_graph);
     };
 
     Plot.prototype.closest_value_index = function(mouse_x){
@@ -61,15 +207,13 @@ IPython = (function(IPython) {
         else return bisect_index - 1;
     };
 
-    Plot.prototype.create_svg = function() {
+    Plot.prototype.setup_svg = function() {
         var that = this;
 
         var x = this.x,
             y = this.y,
             w = this.w,
             h = this.h,
-            points = this.points,
-            points2d = this.points2d,
             label_margin = this.label_margin;
 
         var m = [10, 10, 20, 80],
@@ -86,13 +230,13 @@ IPython = (function(IPython) {
             .attr("height", h + m[0] + m[2] + this.zoom_gap + this.zoom_h);
 
         var main = this.main = svg.append("svg:g")
-            .attr("id", "main-" + this.uuid)
+            .attr("id", "main-" + this.id)
             .attr("transform", "translate(" + m[3] + "," + m[0] + ")");
 
-        var graph = main.append("svg:g")
-            .attr("id", "graph-" + this.uuid);
+        var graph = this.graph = main.append("svg:g")
+            .attr("id", "graph-" + this.id);
 
-        var clip_id = "clip-" + this.uuid;
+        var clip_id = "clip-" + this.id;
 
         // clip path - don't draw outside this box
         var clip = main.append("svg:clipPath")
@@ -102,10 +246,6 @@ IPython = (function(IPython) {
             .attr("height", h);
 
         graph.attr("clip-path", "url(#" + clip_id + ")");
-
-        // add the area path for data sections
-        graph.append("svg:g")
-            .attr("class", "graph areas");
 
         // Add the x-axis.
         main.append("svg:g")
@@ -117,13 +257,6 @@ IPython = (function(IPython) {
         main.append("svg:g")
             .attr("class", "y axis")
             .call(y_axis);
-
-        // add the line path for data sections
-        graph.append("svg:g")
-            .attr("class", "graph lines");
-
-        graph.append("svg:g")
-            .attr("class", "graph points");
 
         // add a locator to graph
         var locator = this.locator = main.append("svg:g")
@@ -153,7 +286,7 @@ IPython = (function(IPython) {
         var zoom_context = this.zoom_context = svg.append("svg:g")
             .attr("class", "zoom-context")
             .attr("transform", "translate(" + m[3] + ", " + zoom_offset + ")");
-        var zoom_graph = this.zoom_context.append("svg:g")
+        var zoom_graph = this.zoom_graph = this.zoom_context.append("svg:g")
             .attr("class", "zoom-graph")
             .attr("transform", "scale(1," + this.zoom_y_scale + ")");
         zoom_graph.append("svg:g")
@@ -184,17 +317,6 @@ IPython = (function(IPython) {
         // resize domain to be a little further out
         var y_domain_offset = (y.domain()[1] - y.domain()[0]) * .025;
         y.domain([y.domain()[0] - y_domain_offset, y.domain()[1] + y_domain_offset]);
-
-        // SVG line generator
-        var line = this.line = d3.svg.line()
-            .x(function(d) {return x(d[0]);})
-            .y(function(d) {return y(d[1]);});
-
-        // SVG area generator, for the fill
-        var area = this.area = d3.svg.area()
-            .x(function(d) { return x(d[0]); })
-            .y0(h)
-            .y1(function(d) { return y(d[1]); });
 
         this.render(graph);
         this.render(zoom_graph);
@@ -251,8 +373,8 @@ IPython = (function(IPython) {
 
         // Adjust graph when dragging the zoom box
         this.zoom_box.call(d3.behavior.drag().on("drag", function(d, i){
-            new_start = x_zoom.invert(x_zoom(x.domain()[0]) + d3.event.dx);
-            new_end = x_zoom.invert(x_zoom(x.domain()[1]) + d3.event.dx);
+            var new_start = x_zoom.invert(x_zoom(x.domain()[0]) + d3.event.dx);
+            var new_end = x_zoom.invert(x_zoom(x.domain()[1]) + d3.event.dx);
 
             if (x_zoom.domain()[0] < new_start && new_end < x_zoom.domain()[1]){
                 x.domain([new_start, new_end]);
@@ -262,7 +384,7 @@ IPython = (function(IPython) {
 
         // Adjust graph when dragging left zoom handle
         this.zoom_box_left_handle.call(d3.behavior.drag().on("drag", function(d, i){
-            new_start = x_zoom.invert(x_zoom(x.domain()[0]) + d3.event.dx);
+            var new_start = x_zoom.invert(x_zoom(x.domain()[0]) + d3.event.dx);
 
             if (x_zoom.domain()[0] < new_start && new_start < x.domain()[1]){
                 x.domain([new_start, x.domain()[1]]);
@@ -272,7 +394,7 @@ IPython = (function(IPython) {
 
         // Adjust graph when dragging right zoom handle
         this.zoom_box_right_handle.call(d3.behavior.drag().on("drag", function(d, i){
-            new_end = x_zoom.invert(x_zoom(x.domain()[1]) + d3.event.dx);
+            var new_end = x_zoom.invert(x_zoom(x.domain()[1]) + d3.event.dx);
 
             if (new_end < x_zoom.domain()[1] && x.domain()[0] < new_end){
                 x.domain([x.domain()[0], new_end]);
@@ -282,6 +404,7 @@ IPython = (function(IPython) {
     };
 
     Plot.prototype.move_locator = function(mouse){
+        return false;
         var x = this.x,
             y = this.y,
             h = this.h,
@@ -328,61 +451,13 @@ IPython = (function(IPython) {
     };
 
     Plot.prototype.render = function(context){
-        var that = this;
-        var graph_areas = context.select(".graph.areas");
-        var graph_lines = context.select(".graph.lines");
-        var graph_points = context.select(".graph.points");
-        var x = this.x,
-            y = this.y,
-            h = this.h;
-
-        var single_points = this.single_points;
-
-        that.main.select(".x.axis").call(that.x_axis);
-
-        var area_select = graph_areas.selectAll("path.area").data(that.segments);
-        area_select.enter()
-            .insert("svg:path")
-            .attr("class", "area")
-            .attr("d", function(d){return that.area(d);});
-        area_select
-            .attr("d", function(d){return that.area(d);});
-        area_select.exit().remove();
-
-        var line_select = graph_lines.selectAll("path.line").data(that.segments);
-        line_select.enter()
-            .insert("svg:path") .attr("class", "line")
-            .attr("d", function(d){return that.line(d);});
-        line_select
-            .attr("d", function(d){return that.line(d);});
-        line_select.exit().remove();
-
-        var point_select = graph_points.selectAll("circle").data(single_points);
-        point_select.enter()
-            .insert("svg:circle")
-            .attr("class", "point")
-            .attr("r", 1)
-            .attr("cx", function(d){return x(d[0]);})
-            .attr("cy", function(d){return y(d[1]);});
-        point_select
-            .attr("cx", function(d){return x(d[0]);})
-            .attr("cy", function(d){return y(d[1]);});
-        point_select.exit().remove();
-
-        var point_line_select = graph_points.selectAll("path.line").data(single_points);
-        point_line_select.enter()
-            .insert("svg:path")
-            .attr("class", "line")
-            .attr("d", function(d){
-                return d3.svg.line()([[x(d[0]), y(d[1])], [x(d[0]), h]]);});
-        point_line_select
-            .attr("class", "line")
-            .attr("d", function(d){
-                return d3.svg.line()([[x(d[0]), y(d[1])], [x(d[0]), h]]);});
-        point_line_select.exit().remove();
-
-
-        that.update_zoom_box();
+        for (var graph_element_idx in this.graph_elements) {
+            var graph_element = this.graph_elements[graph_element_idx];
+            graph_element.render_to(context, this);
+        }
+        this.main.select(".x.axis").call(this.x_axis);
+        this.main.select(".y.axis").call(this.y_axis);
+        this.update_zoom_box();
     };
 
     Plot.prototype.update_zoom_box = function(){
