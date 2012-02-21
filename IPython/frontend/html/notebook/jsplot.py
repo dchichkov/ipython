@@ -10,16 +10,6 @@ except ImportError:
     import json
 
 
-def plot(x, y):
-    points = [zip(x, y)]
-    return Javascript("new IPython.Plot(element, %s);" % json.dumps(points))
-
-
-def line(x, y):
-    plot_ctx = current_plot_context()
-    plot_ctx.points.append(zip(x, y))
-
-
 class plot_context:
     def __enter__(self):
         plot_ctx = current_plot_context()
